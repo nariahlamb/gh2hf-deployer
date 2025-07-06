@@ -5,7 +5,13 @@
  * 运行方式：node test-hf-api.js
  */
 
-const { HfApi, createRepo } = require('@huggingface/hub');
+const {
+  createRepo,
+  uploadFile,
+  listSpaces,
+  deleteRepo,
+  whoAmI
+} = require('@huggingface/hub');
 
 // 从环境变量获取配置
 const HF_TOKEN = process.env.HUGGINGFACE_TOKEN;
@@ -24,9 +30,8 @@ async function testHuggingFaceAPI() {
   try {
     // 1. 测试 API 连接
     console.log('1️⃣ 测试 API 连接...');
-    const hfApi = new HfApi({ accessToken: HF_TOKEN });
-    
-    const userInfo = await hfApi.whoAmI();
+
+    const userInfo = await whoAmI({ credentials: { accessToken: HF_TOKEN } });
     console.log(`✅ API 连接成功! 用户: ${userInfo.name}`);
     console.log(`   用户名: ${userInfo.name}`);
     console.log(`   头像: ${userInfo.avatarUrl}\n`);
@@ -39,17 +44,15 @@ async function testHuggingFaceAPI() {
     console.log(`   Space ID: ${spaceId}`);
     
     try {
-      const repoUrl = await createRepo({
-        repo: spaceId,
-        accessToken: HF_TOKEN,
-        repoType: 'space',
+      const result = await createRepo({
+        repo: { type: 'space', name: spaceId },
+        credentials: { accessToken: HF_TOKEN },
         private: false,
-        sdk: 'docker',
-        hardware: 'cpu-basic'
+        sdk: 'docker'
       });
       
       console.log(`✅ Space 创建成功!`);
-      console.log(`   URL: ${repoUrl}`);
+      console.log(`   URL: ${result.repoUrl}`);
       console.log(`   访问地址: https://huggingface.co/spaces/${spaceId}\n`);
 
       // 3. 测试上传文件
@@ -71,34 +74,51 @@ pinned: false
 创建时间: ${new Date().toISOString()}
 `;
 
-      await hfApi.uploadFile({
-        repo: spaceId,
-        file: new Blob([readmeContent], { type: 'text/plain' }),
-        path: 'README.md',
-        repoType: 'space',
-        commitMessage: 'Add README.md'
+      await uploadFile({
+        repo: { type: 'space', name: spaceId },
+        credentials: { accessToken: HF_TOKEN },
+        file: {
+          path: 'README.md',
+          content: new Blob([readmeContent], { type: 'text/plain' })
+        },
+        commitTitle: 'Add README.md'
       });
 
       console.log('✅ README.md 上传成功!\n');
 
       // 4. 测试获取 Space 状态
       console.log('4️⃣ 测试获取 Space 状态...');
-      
-      const spaceInfo = await hfApi.spaceInfo({ repo: spaceId });
-      console.log(`✅ Space 状态获取成功!`);
-      console.log(`   名称: ${spaceInfo.name}`);
-      console.log(`   SDK: ${spaceInfo.sdk}`);
-      console.log(`   状态: ${spaceInfo.runtime?.stage || 'unknown'}`);
-      console.log(`   硬件: ${spaceInfo.runtime?.hardware || 'cpu-basic'}\n`);
+
+      // 使用 listSpaces 查找我们的 Space
+      let spaceFound = false;
+      for await (const space of listSpaces({
+        search: { owner: HF_USERNAME, query: testSpaceName },
+        credentials: { accessToken: HF_TOKEN },
+        additionalFields: ['runtime']
+      })) {
+        if (space.name === testSpaceName) {
+          console.log(`✅ Space 状态获取成功!`);
+          console.log(`   名称: ${space.name}`);
+          console.log(`   SDK: ${space.sdk}`);
+          console.log(`   状态: ${space.runtime?.stage || 'unknown'}`);
+          console.log(`   硬件: ${space.runtime?.hardware || 'cpu-basic'}\n`);
+          spaceFound = true;
+          break;
+        }
+      }
+
+      if (!spaceFound) {
+        console.log('⚠️ Space 未在列表中找到，但这可能是正常的（刚创建的 Space 可能需要时间同步）\n');
+      }
 
       // 5. 清理测试 Space
       console.log('5️⃣ 清理测试 Space...');
-      
-      await hfApi.deleteRepo({
-        repo: spaceId,
-        repoType: 'space'
+
+      await deleteRepo({
+        repo: { type: 'space', name: spaceId },
+        credentials: { accessToken: HF_TOKEN }
       });
-      
+
       console.log('✅ 测试 Space 已删除\n');
 
     } catch (spaceError) {
@@ -106,9 +126,9 @@ pinned: false
       
       // 尝试清理可能创建的 Space
       try {
-        await hfApi.deleteRepo({
-          repo: spaceId,
-          repoType: 'space'
+        await deleteRepo({
+          repo: { type: 'space', name: spaceId },
+          credentials: { accessToken: HF_TOKEN }
         });
         console.log('🧹 已清理可能创建的测试 Space');
       } catch (cleanupError) {

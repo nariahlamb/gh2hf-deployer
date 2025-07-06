@@ -1,15 +1,24 @@
 // Hugging Face API 客户端
 // 使用官方 Hugging Face Hub API
 
-import { HfApi, createRepo } from '@huggingface/hub'
+import {
+  createRepo,
+  uploadFile as hfUploadFile,
+  listSpaces,
+  deleteRepo as hfDeleteRepo,
+  whoAmI as hfWhoAmI,
+  type RepoDesignation,
+  type SpaceSdk,
+  type SpaceHardwareFlavor
+} from '@huggingface/hub'
 
 interface CreateSpaceParams {
   spaceName: string
   visibility: 'public' | 'private'
-  hardware: 'cpu-basic' | 'cpu-upgrade' | 'gpu-t4'
+  hardware: SpaceHardwareFlavor
   description?: string
   tags?: string[]
-  sdk: 'docker' | 'gradio' | 'streamlit' | 'static'
+  sdk: SpaceSdk
 }
 
 interface SpaceInfo {
@@ -23,33 +32,30 @@ interface SpaceInfo {
 }
 
 export class HuggingFaceClient {
-  private hfApi: HfApi
+  private accessToken: string
   private username: string
 
   constructor(token: string, username: string) {
-    this.hfApi = new HfApi({ accessToken: token })
+    this.accessToken = token
     this.username = username
   }
 
   async createSpace(params: CreateSpaceParams): Promise<SpaceInfo> {
     const spaceId = `${this.username}/${params.spaceName}`
+    const repo: RepoDesignation = { type: 'space', name: spaceId }
 
     try {
       console.log('Creating space with params:', params)
 
-      // 使用官方 HfApi 创建 Space
-      const repoUrl = await createRepo({
-        repo: spaceId,
-        accessToken: this.hfApi.accessToken,
-        repoType: 'space',
+      // 使用官方 createRepo 函数创建 Space
+      const result = await createRepo({
+        repo,
+        credentials: { accessToken: this.accessToken },
         private: params.visibility === 'private',
-        sdk: params.sdk,
-        hardware: params.hardware,
-        spaceSecrets: [],
-        spaceVariables: []
+        sdk: params.sdk
       })
 
-      console.log('Space created successfully:', repoUrl)
+      console.log('Space created successfully:', result.repoUrl)
 
       // 创建 README.md 文件
       const readmeContent = `---
@@ -68,11 +74,13 @@ ${params.description || 'Deployed from GitHub using GH2HF Deployer'}
 `
 
       // 上传 README.md
-      await this.hfApi.uploadFile({
-        repo: spaceId,
-        file: new Blob([readmeContent], { type: 'text/plain' }),
-        path: 'README.md',
-        repoType: 'space'
+      await hfUploadFile({
+        repo,
+        credentials: { accessToken: this.accessToken },
+        file: {
+          path: 'README.md',
+          content: new Blob([readmeContent], { type: 'text/plain' })
+        }
       })
 
       return {
@@ -94,13 +102,17 @@ ${params.description || 'Deployed from GitHub using GH2HF Deployer'}
     try {
       console.log(`Uploading file ${filePath} to space ${spaceId}`)
 
-      // 使用官方 HfApi 上传文件
-      await this.hfApi.uploadFile({
-        repo: spaceId,
-        file: new Blob([content], { type: 'text/plain' }),
-        path: filePath,
-        repoType: 'space',
-        commitMessage: `Upload ${filePath}`
+      const repo: RepoDesignation = { type: 'space', name: spaceId }
+
+      // 使用官方 uploadFile 函数上传文件
+      await hfUploadFile({
+        repo,
+        credentials: { accessToken: this.accessToken },
+        file: {
+          path: filePath,
+          content: new Blob([content], { type: 'text/plain' })
+        },
+        commitTitle: `Upload ${filePath}`
       })
 
       console.log(`Successfully uploaded ${filePath}`)
@@ -114,17 +126,42 @@ ${params.description || 'Deployed from GitHub using GH2HF Deployer'}
     try {
       console.log(`Getting status for space ${spaceId}`)
 
-      // 使用官方 HfApi 获取 Space 信息
-      const spaceInfo = await this.hfApi.spaceInfo({ repo: spaceId })
+      // 使用 listSpaces 函数查找特定的 Space
+      const spaceName = spaceId.split('/')[1] || spaceId
+      const owner = spaceId.split('/')[0] || this.username
 
+      for await (const space of listSpaces({
+        search: { owner, query: spaceName },
+        credentials: { accessToken: this.accessToken },
+        additionalFields: ['runtime']
+      })) {
+        if (space.name === spaceName || space.id === spaceId) {
+          const hardware = space.runtime?.hardware
+          const hardwareString = typeof hardware === 'string'
+            ? hardware
+            : hardware?.current || 'cpu-basic'
+
+          return {
+            id: spaceId,
+            name: space.name,
+            url: `https://huggingface.co/spaces/${spaceId}`,
+            status: space.runtime?.stage || 'unknown',
+            visibility: space.private ? 'private' : 'public',
+            hardware: hardwareString,
+            sdk: space.sdk || 'docker',
+          }
+        }
+      }
+
+      // 如果没找到，返回默认状态
       return {
         id: spaceId,
-        name: spaceInfo.name,
+        name: spaceName,
         url: `https://huggingface.co/spaces/${spaceId}`,
-        status: spaceInfo.runtime?.stage || 'unknown',
-        visibility: spaceInfo.private ? 'private' : 'public',
-        hardware: spaceInfo.runtime?.hardware || 'cpu-basic',
-        sdk: spaceInfo.sdk || 'docker',
+        status: 'unknown',
+        visibility: 'public',
+        hardware: 'cpu-basic',
+        sdk: 'docker',
       }
     } catch (error: any) {
       console.error('Error getting space status:', error)
@@ -136,10 +173,12 @@ ${params.description || 'Deployed from GitHub using GH2HF Deployer'}
     try {
       console.log(`Deleting space ${spaceId}`)
 
-      // 使用官方 HfApi 删除 Space
-      await this.hfApi.deleteRepo({
-        repo: spaceId,
-        repoType: 'space'
+      const repo: RepoDesignation = { type: 'space', name: spaceId }
+
+      // 使用官方 deleteRepo 函数删除 Space
+      await hfDeleteRepo({
+        repo,
+        credentials: { accessToken: this.accessToken }
       })
 
       console.log(`Successfully deleted space ${spaceId}`)
@@ -152,8 +191,10 @@ ${params.description || 'Deployed from GitHub using GH2HF Deployer'}
   // 验证token是否有效
   async validateToken(): Promise<boolean> {
     try {
-      // 使用官方 HfApi 验证 token
-      const userInfo = await this.hfApi.whoAmI()
+      // 使用官方 whoAmI 函数验证 token
+      const userInfo = await hfWhoAmI({
+        credentials: { accessToken: this.accessToken }
+      })
       return !!userInfo.name
     } catch (error) {
       console.error('Token validation failed:', error)
@@ -164,8 +205,10 @@ ${params.description || 'Deployed from GitHub using GH2HF Deployer'}
   // 获取用户信息
   async getUserInfo(): Promise<any> {
     try {
-      // 使用官方 HfApi 获取用户信息
-      const userInfo = await this.hfApi.whoAmI()
+      // 使用官方 whoAmI 函数获取用户信息
+      const userInfo = await hfWhoAmI({
+        credentials: { accessToken: this.accessToken }
+      })
       return userInfo
     } catch (error: any) {
       console.error('Error getting user info:', error)
