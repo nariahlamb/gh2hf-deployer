@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import '@/styles/globals.css'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -43,17 +44,23 @@ export default function RootLayout({
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <a 
-                    href="https://github.com" 
-                    target="_blank" 
+                  <a
+                    href="/health"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    健康检查
+                  </a>
+                  <a
+                    href="https://github.com/nariahlamb/gh2hf-deployer"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     GitHub
                   </a>
-                  <a 
-                    href="https://huggingface.co" 
-                    target="_blank" 
+                  <a
+                    href="https://huggingface.co"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
@@ -65,7 +72,9 @@ export default function RootLayout({
           </header>
           
           <main className="container mx-auto px-4 py-8">
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </main>
           
           <footer className="border-t mt-16">

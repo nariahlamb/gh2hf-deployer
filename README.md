@@ -104,34 +104,47 @@ npm run dev
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnariahlamb%2Fgh2hf-deployer&env=GITHUB_TOKEN,HUGGINGFACE_TOKEN,HUGGINGFACE_USERNAME&envDescription=Required%20API%20tokens%20for%20GitHub%20and%20Hugging%20Face&envLink=https%3A%2F%2Fgithub.com%2Fnariahlamb%2Fgh2hf-deployer%23environment-variables)
 
 部署时需要设置以下环境变量：
-- `GITHUB_TOKEN`
-- `HUGGINGFACE_TOKEN`
-- `HUGGINGFACE_USERNAME`
+- `GITHUB_TOKEN` - GitHub Personal Access Token
+- `HUGGINGFACE_TOKEN` - Hugging Face Access Token
+- `HUGGINGFACE_USERNAME` - 您的Hugging Face用户名
+
+📖 **详细部署指南：** [DEPLOYMENT.md](DEPLOYMENT.md)
+📚 **使用说明：** [USAGE.md](USAGE.md)
 
 ## 📖 使用指南
 
-### 1. 输入GitHub仓库
-- 在首页输入包含Docker配置的GitHub仓库URL
-- 支持多种URL格式：
-  - `https://github.com/username/repository`
-  - `git@github.com:username/repository.git`
-  - `username/repository`
+### 快速开始
+1. **输入仓库URL** → 自动检测Docker配置
+2. **配置Space参数** → 设置名称、可见性、硬件
+3. **一键部署** → 实时监控进度
+4. **获取链接** → 立即访问您的应用
 
-### 2. 验证配置
-- 系统自动检测仓库中的Docker配置文件
-- 显示仓库信息和Docker配置详情
-- 确认配置无误后继续
+### 示例项目
+可以用来测试的公开项目：
+- `https://github.com/gradio-app/gradio` - Gradio机器学习界面
+- `https://github.com/streamlit/streamlit-hello` - Streamlit数据应用
+- `https://github.com/tiangolo/fastapi` - FastAPI Web框架
 
-### 3. 配置部署
-- 设置Hugging Face Space名称
-- 选择可见性（公开/私有）
-- 选择硬件配置
-- 添加描述和标签（可选）
+### 详细步骤
+1. **输入GitHub仓库**
+   - 支持多种URL格式
+   - 自动验证仓库访问权限
+   - 检测Docker配置文件
 
-### 4. 执行部署
-- 实时查看部署进度
-- 查看详细的部署日志
-- 部署完成后获取访问链接
+2. **验证配置**
+   - 显示仓库信息和统计
+   - 分析Docker配置详情
+   - 确认部署兼容性
+
+3. **配置部署**
+   - 设置Space名称和描述
+   - 选择可见性（公开/私有）
+   - 选择硬件配置（CPU/GPU）
+
+4. **执行部署**
+   - 实时进度监控
+   - 详细部署日志
+   - 错误诊断和处理
 
 ## 🔧 支持的项目类型
 
