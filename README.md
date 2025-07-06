@@ -2,6 +2,8 @@
 
 一键将GitHub上的Docker项目部署到Hugging Face Spaces的Web应用程序。
 
+[![Build Check](https://github.com/nariahlamb/gh2hf-deployer/actions/workflows/build-check.yml/badge.svg)](https://github.com/nariahlamb/gh2hf-deployer/actions/workflows/build-check.yml)
+[![Deploy to Vercel](https://github.com/nariahlamb/gh2hf-deployer/actions/workflows/deploy.yml/badge.svg)](https://github.com/nariahlamb/gh2hf-deployer/actions/workflows/deploy.yml)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnariahlamb%2Fgh2hf-deployer&env=GITHUB_TOKEN,HUGGINGFACE_TOKEN,HUGGINGFACE_USERNAME&envDescription=Required%20API%20tokens%20for%20GitHub%20and%20Hugging%20Face&envLink=https%3A%2F%2Fgithub.com%2Fnariahlamb%2Fgh2hf-deployer%23environment-variables)
 
 ## 🚀 功能特性

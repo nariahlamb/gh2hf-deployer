@@ -1,0 +1,59 @@
+name: Build Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Type check
+      run: npm run type-check
+      
+    - name: Lint check
+      run: npm run lint
+      
+    - name: Build application
+      run: npm run build
+      env:
+        # Use dummy values for build testing
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || 'dummy_github_token' }}
+        HUGGINGFACE_TOKEN: hf_dummy_token_for_build_test
+        HUGGINGFACE_USERNAME: dummy_user
+        NEXT_PUBLIC_APP_URL: https://example.com
+        
+    - name: Check build output
+      run: |
+        if [ -d ".next" ]; then
+          echo "✅ Build successful - .next directory created"
+          ls -la .next/
+        else
+          echo "❌ Build failed - .next directory not found"
+          exit 1
+        fi
+        
+    - name: Build summary
+      run: |
+        echo "## Build Summary 🚀" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Dependencies installed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ TypeScript compilation passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ ESLint checks passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Next.js build completed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Ready for deployment! 🎉" >> $GITHUB_STEP_SUMMARY
