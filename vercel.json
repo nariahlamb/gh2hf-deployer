@@ -1,0 +1,24 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "outputDirectory": ".next",
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
+  "env": {
+    "GITHUB_TOKEN": "@github_token",
+    "HUGGINGFACE_TOKEN": "@huggingface_token",
+    "HUGGINGFACE_USERNAME": "@huggingface_username"
+  },
+  "build": {
+    "env": {
+      "GITHUB_TOKEN": "@github_token",
+      "HUGGINGFACE_TOKEN": "@huggingface_token",
+      "HUGGINGFACE_USERNAME": "@huggingface_username"
+    }
+  }
+}
