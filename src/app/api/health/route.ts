@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { Octokit } from '@octokit/rest'
-import { HfApi } from '@huggingface/hub'
 
 export async function GET() {
   const checks = {
@@ -43,30 +42,39 @@ export async function GET() {
     }
   }
 
-  // 检查Hugging Face API
+  // 检查Hugging Face配置
   try {
-    const hf = new HfApi({
-      accessToken: process.env.HUGGINGFACE_TOKEN,
-    })
-    
-    // 尝试获取用户信息
+    const token = process.env.HUGGINGFACE_TOKEN
     const username = process.env.HUGGINGFACE_USERNAME
-    if (username) {
-      // 这里我们只是验证token是否有效，不实际调用可能不存在的API
+
+    if (!token) {
       checks.huggingface = {
-        status: 'success',
-        message: `Hugging Face配置正确 (用户: ${username})`
+        status: 'error',
+        message: 'HUGGINGFACE_TOKEN未设置'
       }
-    } else {
+    } else if (!username) {
       checks.huggingface = {
         status: 'error',
         message: 'HUGGINGFACE_USERNAME未设置'
+      }
+    } else {
+      // 简单验证token格式
+      if (token.startsWith('hf_')) {
+        checks.huggingface = {
+          status: 'success',
+          message: `Hugging Face配置正确 (用户: ${username})`
+        }
+      } else {
+        checks.huggingface = {
+          status: 'error',
+          message: 'HUGGINGFACE_TOKEN格式无效'
+        }
       }
     }
   } catch (error: any) {
     checks.huggingface = {
       status: 'error',
-      message: `Hugging Face API连接失败: ${error.message}`
+      message: `Hugging Face配置检查失败: ${error.message}`
     }
   }
 

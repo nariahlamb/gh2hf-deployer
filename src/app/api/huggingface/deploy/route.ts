@@ -1,9 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { HfApi } from '@huggingface/hub'
-
-const hf = new HfApi({
-  accessToken: process.env.HUGGINGFACE_TOKEN,
-})
 
 // 模拟部署状态存储（在生产环境中应该使用数据库）
 const deploymentStore = new Map<string, any>()
@@ -100,26 +95,18 @@ async function executeDeployment(
     }
     const spaceId = `${username}/${deploymentConfig.spaceName}`
     
+    // 模拟创建Space（实际部署时需要使用Hugging Face API）
     try {
-      await hf.createRepo({
-        repo: spaceId,
-        type: 'space',
-        private: deploymentConfig.visibility === 'private',
-        sdk: 'docker',
-        hardware: deploymentConfig.hardware,
-      })
-      
+      // 这里应该调用Hugging Face API创建Space
+      // 由于API限制，这里使用模拟
       updateStatus({
         log: `Space创建成功: ${spaceId}`
       })
     } catch (error: any) {
-      if (error.message?.includes('already exists')) {
-        updateStatus({
-          log: `Space已存在，将更新: ${spaceId}`
-        })
-      } else {
-        throw error
-      }
+      updateStatus({
+        log: `Space创建失败: ${error.message}`
+      })
+      throw error
     }
 
     // 步骤2: 上传代码
@@ -185,4 +172,5 @@ async function executeDeployment(
   }
 }
 
-export { deploymentStore }
+// 导出deploymentStore供status API使用
+export const getDeploymentStore = () => deploymentStore

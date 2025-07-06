@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { deploymentStore } from '../deploy/route'
+import { getDeploymentStore } from '../deploy/route'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
+    const deploymentStore = getDeploymentStore()
     const status = deploymentStore.get(deploymentId)
     
     if (!status) {
