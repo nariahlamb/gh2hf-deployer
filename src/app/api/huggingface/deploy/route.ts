@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// 强制动态渲染
+export const dynamic = 'force-dynamic'
+
 // 模拟部署状态存储（在生产环境中应该使用数据库）
 const deploymentStore = new Map<string, any>()
 

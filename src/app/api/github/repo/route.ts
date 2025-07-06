@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Octokit } from '@octokit/rest'
 
+// 强制动态渲染
+export const dynamic = 'force-dynamic'
+
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
 })

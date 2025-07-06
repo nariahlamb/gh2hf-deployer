@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { Octokit } from '@octokit/rest'
 
+// 强制动态渲染
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const checks = {
     github: { status: 'unknown', message: '' },
