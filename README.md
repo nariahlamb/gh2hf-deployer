@@ -2,7 +2,7 @@
 
 一键将GitHub上的Docker项目部署到Hugging Face Spaces的Web应用程序。
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyour-username%2Fgh2hf-deployer&env=GITHUB_TOKEN,HUGGINGFACE_TOKEN,HUGGINGFACE_USERNAME&envDescription=Required%20API%20tokens%20for%20GitHub%20and%20Hugging%20Face&envLink=https%3A%2F%2Fgithub.com%2Fyour-username%2Fgh2hf-deployer%23environment-variables)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnariahlamb%2Fgh2hf-deployer&env=GITHUB_TOKEN,HUGGINGFACE_TOKEN,HUGGINGFACE_USERNAME&envDescription=Required%20API%20tokens%20for%20GitHub%20and%20Hugging%20Face&envLink=https%3A%2F%2Fgithub.com%2Fnariahlamb%2Fgh2hf-deployer%23environment-variables)
 
 ## 🚀 功能特性
 
@@ -31,7 +31,7 @@
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/your-username/gh2hf-deployer.git
+git clone https://github.com/nariahlamb/gh2hf-deployer.git
 cd gh2hf-deployer
 ```
 
@@ -101,7 +101,7 @@ npm run dev
 
 点击下面的按钮一键部署到Vercel：
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyour-username%2Fgh2hf-deployer&env=GITHUB_TOKEN,HUGGINGFACE_TOKEN,HUGGINGFACE_USERNAME&envDescription=Required%20API%20tokens%20for%20GitHub%20and%20Hugging%20Face&envLink=https%3A%2F%2Fgithub.com%2Fyour-username%2Fgh2hf-deployer%23environment-variables)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnariahlamb%2Fgh2hf-deployer&env=GITHUB_TOKEN,HUGGINGFACE_TOKEN,HUGGINGFACE_USERNAME&envDescription=Required%20API%20tokens%20for%20GitHub%20and%20Hugging%20Face&envLink=https%3A%2F%2Fgithub.com%2Fnariahlamb%2Fgh2hf-deployer%23environment-variables)
 
 部署时需要设置以下环境变量：
 - `GITHUB_TOKEN`
@@ -167,9 +167,9 @@ npm run dev
 如果您遇到问题或有任何疑问，请：
 
 1. 查看 [常见问题](docs/FAQ.md)
-2. 搜索现有的 [Issues](https://github.com/your-username/gh2hf-deployer/issues)
-3. 创建新的 [Issue](https://github.com/your-username/gh2hf-deployer/issues/new)
+2. 搜索现有的 [Issues](https://github.com/nariahlamb/gh2hf-deployer/issues)
+3. 创建新的 [Issue](https://github.com/nariahlamb/gh2hf-deployer/issues/new)
 
 ---
 
-Made with ❤️ by [Your Name](https://github.com/your-username)
+Made with ❤️ by [nariahlamb](https://github.com/nariahlamb)
