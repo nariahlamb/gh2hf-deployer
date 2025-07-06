@@ -27,6 +27,10 @@ export interface DockerConfig {
   entrypoint?: string[];
   cmd?: string[];
   env?: Record<string, string>;
+  projectType?: string;
+  recommendedEnvVars?: Record<string, string>;
+  warnings?: string[];
+  hardwareRecommendation?: 'cpu-basic' | 'cpu-upgrade' | 'gpu-t4';
 }
 
 export interface HuggingFaceSpace {

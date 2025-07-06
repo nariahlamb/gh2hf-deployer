@@ -152,6 +152,56 @@ export function RepoValidation() {
             </div>
           )}
 
+          {dockerConfig.projectType && (
+            <div className="space-y-2">
+              <h4 className="font-medium">项目类型</h4>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  {dockerConfig.projectType}
+                </span>
+                {dockerConfig.hardwareRecommendation && (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                    推荐: {dockerConfig.hardwareRecommendation}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {dockerConfig.warnings && dockerConfig.warnings.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="font-medium text-yellow-800">注意事项</h4>
+              <ul className="space-y-1">
+                {dockerConfig.warnings.map((warning, index) => (
+                  <li key={index} className="flex items-start gap-2 text-sm text-yellow-700">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    {warning}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {dockerConfig.recommendedEnvVars && Object.keys(dockerConfig.recommendedEnvVars).length > 0 && (
+            <div className="space-y-2">
+              <h4 className="font-medium">推荐环境变量</h4>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="space-y-1 text-sm font-mono">
+                  {Object.entries(dockerConfig.recommendedEnvVars).map(([key, value]) => (
+                    <div key={key} className="flex">
+                      <span className="text-blue-600 font-medium">{key}</span>
+                      <span className="text-gray-500 mx-1">=</span>
+                      <span className="text-gray-700">{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  💡 这些环境变量将在部署配置中自动建议
+                </p>
+              </div>
+            </div>
+          )}
+
           {!dockerConfig.hasDockerfile && !dockerConfig.hasDockerCompose && (
             <div className="flex items-start gap-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />

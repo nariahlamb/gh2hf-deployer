@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Octokit } from '@octokit/rest'
-import { extractDockerPorts, extractDockerEnv } from '@/lib/utils'
+import { extractDockerPorts, extractDockerEnv, detectProjectType } from '@/lib/utils'
 
 // 强制动态渲染
 export const dynamic = 'force-dynamic'
@@ -117,9 +117,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // 获取仓库信息用于项目类型检测
+    const { data: repoData } = await octokit.rest.repos.get({
+      owner,
+      repo,
+    })
+
+    // 检测项目类型和推荐配置
+    const projectInfo = detectProjectType(repoData, dockerConfig)
+
     return NextResponse.json({
       success: true,
-      data: dockerConfig
+      data: {
+        ...dockerConfig,
+        projectType: projectInfo.type,
+        recommendedEnvVars: projectInfo.recommendedEnvVars,
+        warnings: projectInfo.warnings,
+        hardwareRecommendation: projectInfo.hardwareRecommendation
+      }
     })
 
   } catch (error: any) {

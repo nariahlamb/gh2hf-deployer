@@ -24,12 +24,13 @@ const deploymentSchema = z.object({
 type DeploymentFormData = z.infer<typeof deploymentSchema>
 
 export function DeploymentConfig() {
-  const { 
+  const {
     repoInfo,
-    setDeploymentConfig, 
-    setCurrentStep, 
+    dockerConfig,
+    setDeploymentConfig,
+    setCurrentStep,
     setLoading,
-    isLoading 
+    isLoading
   } = useAppStore()
 
   const {
@@ -42,9 +43,9 @@ export function DeploymentConfig() {
     defaultValues: {
       spaceName: repoInfo?.name.toLowerCase().replace(/[^a-z0-9-]/g, '-') || '',
       visibility: 'public',
-      hardware: 'cpu-basic',
+      hardware: dockerConfig?.hardwareRecommendation || 'cpu-basic',
       description: repoInfo?.description || '',
-      tags: ''
+      tags: dockerConfig?.projectType ? `${dockerConfig.projectType.toLowerCase()}, docker` : 'docker'
     }
   })
 
@@ -104,6 +105,32 @@ export function DeploymentConfig() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Project Type Info */}
+          {dockerConfig?.projectType && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  {dockerConfig.projectType}
+                </span>
+                {dockerConfig.hardwareRecommendation && (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                    推荐硬件: {dockerConfig.hardwareRecommendation}
+                  </span>
+                )}
+              </div>
+              {dockerConfig.warnings && dockerConfig.warnings.length > 0 && (
+                <div className="text-sm text-blue-700">
+                  <p className="font-medium mb-1">部署注意事项：</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {dockerConfig.warnings.map((warning, index) => (
+                      <li key={index}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Space Name */}
             <div className="space-y-2">
