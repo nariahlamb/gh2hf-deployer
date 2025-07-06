@@ -64,25 +64,26 @@ export async function GET() {
     } else {
       // 真实的API验证
       const hfClient = new HuggingFaceClient(token, username)
-      const isValid = await hfClient.validateToken()
 
-      if (isValid) {
-        try {
+      try {
+        const isValid = await hfClient.validateToken()
+
+        if (isValid) {
           const userInfo = await hfClient.getUserInfo()
           checks.huggingface = {
             status: 'success',
-            message: `Hugging Face API连接成功 (用户: ${userInfo.name || username})`
+            message: `✅ Hugging Face API连接成功 (用户: ${userInfo.name || username})`
           }
-        } catch (error: any) {
+        } else {
           checks.huggingface = {
-            status: 'success',
-            message: `Hugging Face Token有效 (用户: ${username})`
+            status: 'error',
+            message: '❌ HUGGINGFACE_TOKEN无效或已过期'
           }
         }
-      } else {
+      } catch (error: any) {
         checks.huggingface = {
           status: 'error',
-          message: 'HUGGINGFACE_TOKEN无效或已过期'
+          message: `❌ Hugging Face API连接失败: ${error.message}`
         }
       }
     }

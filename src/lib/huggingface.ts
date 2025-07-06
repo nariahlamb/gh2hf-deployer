@@ -1,6 +1,8 @@
 // Hugging Face API 客户端
 // 使用官方 Hugging Face Hub API
 
+import { HfApi, createRepo } from '@huggingface/hub'
+
 interface CreateSpaceParams {
   spaceName: string
   visibility: 'public' | 'private'
@@ -21,45 +23,58 @@ interface SpaceInfo {
 }
 
 export class HuggingFaceClient {
-  private token: string
+  private hfApi: HfApi
   private username: string
-  private baseUrl = 'https://huggingface.co/api'
 
   constructor(token: string, username: string) {
-    this.token = token
+    this.hfApi = new HfApi({ accessToken: token })
     this.username = username
   }
 
   async createSpace(params: CreateSpaceParams): Promise<SpaceInfo> {
     const spaceId = `${this.username}/${params.spaceName}`
-    
+
     try {
-      // 创建Space的API调用
-      const response = await fetch(`${this.baseUrl}/repos/create`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'space',
-          name: params.spaceName,
-          organization: this.username,
-          private: params.visibility === 'private',
-          sdk: params.sdk,
-          hardware: params.hardware,
-          description: params.description || '',
-          tags: params.tags || [],
-        }),
+      console.log('Creating space with params:', params)
+
+      // 使用官方 HfApi 创建 Space
+      const repoUrl = await createRepo({
+        repo: spaceId,
+        accessToken: this.hfApi.accessToken,
+        repoType: 'space',
+        private: params.visibility === 'private',
+        sdk: params.sdk,
+        hardware: params.hardware,
+        spaceSecrets: [],
+        spaceVariables: []
       })
 
-      if (!response.ok) {
-        const errorData = await response.text()
-        throw new Error(`Failed to create space: ${response.status} ${errorData}`)
-      }
+      console.log('Space created successfully:', repoUrl)
 
-      const data = await response.json()
-      
+      // 创建 README.md 文件
+      const readmeContent = `---
+title: ${params.spaceName}
+emoji: 🚀
+colorFrom: blue
+colorTo: green
+sdk: ${params.sdk}
+pinned: false
+${params.hardware ? `hardware: ${params.hardware}` : ''}
+---
+
+# ${params.spaceName}
+
+${params.description || 'Deployed from GitHub using GH2HF Deployer'}
+`
+
+      // 上传 README.md
+      await this.hfApi.uploadFile({
+        repo: spaceId,
+        file: new Blob([readmeContent], { type: 'text/plain' }),
+        path: 'README.md',
+        repoType: 'space'
+      })
+
       return {
         id: spaceId,
         name: params.spaceName,
@@ -77,23 +92,18 @@ export class HuggingFaceClient {
 
   async uploadFile(spaceId: string, filePath: string, content: string): Promise<void> {
     try {
-      const response = await fetch(`${this.baseUrl}/repos/${spaceId}/upload/main/${filePath}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: Buffer.from(content).toString('base64'),
-          encoding: 'base64',
-          message: `Upload ${filePath}`,
-        }),
+      console.log(`Uploading file ${filePath} to space ${spaceId}`)
+
+      // 使用官方 HfApi 上传文件
+      await this.hfApi.uploadFile({
+        repo: spaceId,
+        file: new Blob([content], { type: 'text/plain' }),
+        path: filePath,
+        repoType: 'space',
+        commitMessage: `Upload ${filePath}`
       })
 
-      if (!response.ok) {
-        const errorData = await response.text()
-        throw new Error(`Failed to upload file: ${response.status} ${errorData}`)
-      }
+      console.log(`Successfully uploaded ${filePath}`)
     } catch (error: any) {
       console.error('Error uploading file:', error)
       throw new Error(`Failed to upload file to Space: ${error.message}`)
@@ -102,26 +112,19 @@ export class HuggingFaceClient {
 
   async getSpaceStatus(spaceId: string): Promise<SpaceInfo> {
     try {
-      const response = await fetch(`${this.baseUrl}/repos/${spaceId}`, {
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-        },
-      })
+      console.log(`Getting status for space ${spaceId}`)
 
-      if (!response.ok) {
-        throw new Error(`Failed to get space status: ${response.status}`)
-      }
+      // 使用官方 HfApi 获取 Space 信息
+      const spaceInfo = await this.hfApi.spaceInfo({ repo: spaceId })
 
-      const data = await response.json()
-      
       return {
         id: spaceId,
-        name: data.name,
+        name: spaceInfo.name,
         url: `https://huggingface.co/spaces/${spaceId}`,
-        status: data.runtime?.stage || 'unknown',
-        visibility: data.private ? 'private' : 'public',
-        hardware: data.runtime?.hardware || 'cpu-basic',
-        sdk: data.sdk || 'docker',
+        status: spaceInfo.runtime?.stage || 'unknown',
+        visibility: spaceInfo.private ? 'private' : 'public',
+        hardware: spaceInfo.runtime?.hardware || 'cpu-basic',
+        sdk: spaceInfo.sdk || 'docker',
       }
     } catch (error: any) {
       console.error('Error getting space status:', error)
@@ -131,21 +134,15 @@ export class HuggingFaceClient {
 
   async deleteSpace(spaceId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.baseUrl}/repos/delete`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: spaceId,
-          type: 'space',
-        }),
+      console.log(`Deleting space ${spaceId}`)
+
+      // 使用官方 HfApi 删除 Space
+      await this.hfApi.deleteRepo({
+        repo: spaceId,
+        repoType: 'space'
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to delete space: ${response.status}`)
-      }
+      console.log(`Successfully deleted space ${spaceId}`)
     } catch (error: any) {
       console.error('Error deleting space:', error)
       throw new Error(`Failed to delete space: ${error.message}`)
@@ -155,14 +152,11 @@ export class HuggingFaceClient {
   // 验证token是否有效
   async validateToken(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/whoami-v2`, {
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-        },
-      })
-
-      return response.ok
+      // 使用官方 HfApi 验证 token
+      const userInfo = await this.hfApi.whoAmI()
+      return !!userInfo.name
     } catch (error) {
+      console.error('Token validation failed:', error)
       return false
     }
   }
@@ -170,17 +164,9 @@ export class HuggingFaceClient {
   // 获取用户信息
   async getUserInfo(): Promise<any> {
     try {
-      const response = await fetch(`${this.baseUrl}/whoami-v2`, {
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to get user info: ${response.status}`)
-      }
-
-      return await response.json()
+      // 使用官方 HfApi 获取用户信息
+      const userInfo = await this.hfApi.whoAmI()
+      return userInfo
     } catch (error: any) {
       console.error('Error getting user info:', error)
       throw new Error(`Failed to get user info: ${error.message}`)

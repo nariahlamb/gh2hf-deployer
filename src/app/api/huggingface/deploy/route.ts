@@ -109,6 +109,10 @@ async function executeDeployment(
 
     try {
       // 真实的Hugging Face API调用
+      updateStatus({
+        log: `正在创建Space: ${deploymentConfig.spaceName}`
+      })
+
       const space = await hfClient.createSpace({
         spaceName: deploymentConfig.spaceName,
         visibility: deploymentConfig.visibility,
@@ -119,12 +123,26 @@ async function executeDeployment(
       })
 
       updateStatus({
-        log: `Space创建成功: ${space.url}`
+        log: `✅ Space创建成功: ${space.url}`
       })
+
+      // 验证Space是否真的创建成功
+      try {
+        const spaceStatus = await hfClient.getSpaceStatus(spaceId)
+        updateStatus({
+          log: `✅ Space验证成功，状态: ${spaceStatus.status}`
+        })
+      } catch (verifyError: any) {
+        updateStatus({
+          log: `⚠️ Space创建成功但验证失败: ${verifyError.message}`
+        })
+      }
+
     } catch (error: any) {
       updateStatus({
-        log: `Space创建失败: ${error.message}`
+        log: `❌ Space创建失败: ${error.message}`
       })
+      console.error('Space creation error details:', error)
       throw error
     }
 
