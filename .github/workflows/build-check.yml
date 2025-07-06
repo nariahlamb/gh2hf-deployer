@@ -9,26 +9,25 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'npm'
-        
+
     - name: Install dependencies
-      run: npm ci
-      
+      run: npm install
+
     - name: Type check
       run: npm run type-check
-      
+
     - name: Lint check
       run: npm run lint
-      
+
     - name: Build application
       run: npm run build
       env:
@@ -37,7 +36,7 @@ jobs:
         HUGGINGFACE_TOKEN: hf_dummy_token_for_build_test
         HUGGINGFACE_USERNAME: dummy_user
         NEXT_PUBLIC_APP_URL: https://example.com
-        
+
     - name: Check build output
       run: |
         if [ -d ".next" ]; then
@@ -47,7 +46,7 @@ jobs:
           echo "❌ Build failed - .next directory not found"
           exit 1
         fi
-        
+
     - name: Build summary
       run: |
         echo "## Build Summary 🚀" >> $GITHUB_STEP_SUMMARY
