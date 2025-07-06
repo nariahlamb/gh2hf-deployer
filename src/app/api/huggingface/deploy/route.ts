@@ -94,7 +94,11 @@ async function executeDeployment(
 
     await new Promise(resolve => setTimeout(resolve, 2000)) // 模拟延迟
 
-    const spaceId = `${process.env.HUGGINGFACE_USERNAME || 'user'}/${deploymentConfig.spaceName}`
+    const username = process.env.HUGGINGFACE_USERNAME
+    if (!username) {
+      throw new Error('HUGGINGFACE_USERNAME environment variable is required')
+    }
+    const spaceId = `${username}/${deploymentConfig.spaceName}`
     
     try {
       await hf.createRepo({
