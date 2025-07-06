@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { HuggingFaceClient } from '@/lib/huggingface'
+import { Octokit } from '@octokit/rest'
 
 // 强制动态渲染
 export const dynamic = 'force-dynamic'
@@ -82,6 +84,19 @@ async function executeDeployment(
   }
 
   try {
+    // 验证环境变量
+    const token = process.env.HUGGINGFACE_TOKEN
+    const username = process.env.HUGGINGFACE_USERNAME
+    const githubToken = process.env.GITHUB_TOKEN
+
+    if (!token || !username || !githubToken) {
+      throw new Error('Missing required environment variables: HUGGINGFACE_TOKEN, HUGGINGFACE_USERNAME, or GITHUB_TOKEN')
+    }
+
+    // 初始化客户端
+    const hfClient = new HuggingFaceClient(token, username)
+    const octokit = new Octokit({ auth: githubToken })
+
     // 步骤1: 创建Space
     updateStatus({
       stage: 'creating',
@@ -90,20 +105,21 @@ async function executeDeployment(
       log: '正在创建Space...'
     })
 
-    await new Promise(resolve => setTimeout(resolve, 2000)) // 模拟延迟
-
-    const username = process.env.HUGGINGFACE_USERNAME
-    if (!username) {
-      throw new Error('HUGGINGFACE_USERNAME environment variable is required')
-    }
     const spaceId = `${username}/${deploymentConfig.spaceName}`
-    
-    // 模拟创建Space（实际部署时需要使用Hugging Face API）
+
     try {
-      // 这里应该调用Hugging Face API创建Space
-      // 由于API限制，这里使用模拟
+      // 真实的Hugging Face API调用
+      const space = await hfClient.createSpace({
+        spaceName: deploymentConfig.spaceName,
+        visibility: deploymentConfig.visibility,
+        hardware: deploymentConfig.hardware,
+        description: deploymentConfig.description,
+        tags: deploymentConfig.tags,
+        sdk: 'docker'
+      })
+
       updateStatus({
-        log: `Space创建成功: ${spaceId}`
+        log: `Space创建成功: ${space.url}`
       })
     } catch (error: any) {
       updateStatus({
@@ -112,49 +128,126 @@ async function executeDeployment(
       throw error
     }
 
-    // 步骤2: 上传代码
+    // 步骤2: 获取GitHub仓库内容
     updateStatus({
       stage: 'uploading',
-      progress: 50,
-      message: '上传代码到Space...',
+      progress: 40,
+      message: '获取GitHub仓库内容...',
       log: '正在从GitHub获取代码...'
     })
 
-    await new Promise(resolve => setTimeout(resolve, 3000)) // 模拟延迟
+    // 解析GitHub URL
+    const repoUrl = repoInfo.html_url
+    const [, , , owner, repo] = repoUrl.split('/')
 
-    // 这里应该实现实际的代码上传逻辑
-    // 由于Hugging Face Hub API的限制，这里使用模拟
+    // 获取仓库的主要文件
+    const filesToUpload = ['Dockerfile', 'docker-compose.yml', 'requirements.txt', 'package.json', 'README.md']
+    const uploadedFiles: string[] = []
+
+    for (const fileName of filesToUpload) {
+      try {
+        const { data: fileData } = await octokit.rest.repos.getContent({
+          owner,
+          repo,
+          path: fileName,
+        })
+
+        if ('content' in fileData) {
+          const content = Buffer.from(fileData.content, 'base64').toString('utf-8')
+          await hfClient.uploadFile(spaceId, fileName, content)
+          uploadedFiles.push(fileName)
+          updateStatus({
+            log: `上传文件: ${fileName}`
+          })
+        }
+      } catch (error: any) {
+        if (error.status !== 404) {
+          updateStatus({
+            log: `警告: 无法上传 ${fileName}: ${error.message}`
+          })
+        }
+      }
+    }
+
+    // 步骤3: 创建Space配置文件
     updateStatus({
-      log: '代码上传完成'
+      stage: 'uploading',
+      progress: 60,
+      message: '创建Space配置...',
+      log: '正在创建Space配置文件...'
     })
 
-    // 步骤3: 构建镜像
+    // 创建README.md（如果不存在）
+    if (!uploadedFiles.includes('README.md')) {
+      const readmeContent = `---
+title: ${deploymentConfig.spaceName}
+emoji: 🚀
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
+# ${deploymentConfig.spaceName}
+
+${deploymentConfig.description || 'Deployed from GitHub using GH2HF Deployer'}
+
+## Original Repository
+${repoUrl}
+`
+      await hfClient.uploadFile(spaceId, 'README.md', readmeContent)
+      updateStatus({
+        log: '创建README.md文件'
+      })
+    }
+
+    updateStatus({
+      log: `代码上传完成，共上传 ${uploadedFiles.length + 1} 个文件`
+    })
+
+    // 步骤4: 等待构建
     updateStatus({
       stage: 'building',
       progress: 75,
-      message: '构建Docker镜像...',
-      log: '开始构建Docker镜像...'
+      message: '等待Hugging Face构建...',
+      log: 'Space正在构建中，这可能需要几分钟...'
     })
 
-    await new Promise(resolve => setTimeout(resolve, 5000)) // 模拟延迟
+    // 等待一段时间让构建开始
+    await new Promise(resolve => setTimeout(resolve, 10000))
 
-    updateStatus({
-      log: 'Docker镜像构建完成'
-    })
+    // 检查构建状态
+    let buildAttempts = 0
+    const maxAttempts = 30 // 最多等待5分钟
 
-    // 步骤4: 部署应用
-    updateStatus({
-      stage: 'deploying',
-      progress: 90,
-      message: '部署应用...',
-      log: '正在启动应用...'
-    })
+    while (buildAttempts < maxAttempts) {
+      try {
+        const spaceStatus = await hfClient.getSpaceStatus(spaceId)
+        updateStatus({
+          log: `构建状态: ${spaceStatus.status}`
+        })
 
-    await new Promise(resolve => setTimeout(resolve, 2000)) // 模拟延迟
+        if (spaceStatus.status === 'running') {
+          updateStatus({
+            log: 'Space构建完成并正在运行'
+          })
+          break
+        } else if (spaceStatus.status === 'error') {
+          throw new Error('Space构建失败')
+        }
+      } catch (error: any) {
+        updateStatus({
+          log: `检查状态时出错: ${error.message}`
+        })
+      }
+
+      buildAttempts++
+      await new Promise(resolve => setTimeout(resolve, 10000)) // 等待10秒
+    }
 
     // 步骤5: 完成
     const spaceUrl = `https://huggingface.co/spaces/${spaceId}`
-    
+
     updateStatus({
       stage: 'completed',
       progress: 100,

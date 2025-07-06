@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { Octokit } from '@octokit/rest'
+import { HuggingFaceClient } from '@/lib/huggingface'
 
 // 强制动态渲染
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,7 @@ export async function GET() {
     }
   }
 
-  // 检查Hugging Face配置
+  // 检查Hugging Face API
   try {
     const token = process.env.HUGGINGFACE_TOKEN
     const username = process.env.HUGGINGFACE_USERNAME
@@ -61,23 +62,34 @@ export async function GET() {
         message: 'HUGGINGFACE_USERNAME未设置'
       }
     } else {
-      // 简单验证token格式
-      if (token.startsWith('hf_')) {
-        checks.huggingface = {
-          status: 'success',
-          message: `Hugging Face配置正确 (用户: ${username})`
+      // 真实的API验证
+      const hfClient = new HuggingFaceClient(token, username)
+      const isValid = await hfClient.validateToken()
+
+      if (isValid) {
+        try {
+          const userInfo = await hfClient.getUserInfo()
+          checks.huggingface = {
+            status: 'success',
+            message: `Hugging Face API连接成功 (用户: ${userInfo.name || username})`
+          }
+        } catch (error: any) {
+          checks.huggingface = {
+            status: 'success',
+            message: `Hugging Face Token有效 (用户: ${username})`
+          }
         }
       } else {
         checks.huggingface = {
           status: 'error',
-          message: 'HUGGINGFACE_TOKEN格式无效'
+          message: 'HUGGINGFACE_TOKEN无效或已过期'
         }
       }
     }
   } catch (error: any) {
     checks.huggingface = {
       status: 'error',
-      message: `Hugging Face配置检查失败: ${error.message}`
+      message: `Hugging Face API连接失败: ${error.message}`
     }
   }
 
