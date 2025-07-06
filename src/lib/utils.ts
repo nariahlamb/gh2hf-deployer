@@ -129,7 +129,11 @@ export function detectProjectType(repoInfo: any, dockerConfig: any): {
       type: 'Open WebUI',
       recommendedEnvVars: {
         'WEBUI_SECRET_KEY': 'your-secret-key-here',
+        'ADMIN_USER_EMAIL': 'admin@example.com',
+        'ADMIN_USER_PASSWORD': 'your-admin-password',
+        'SPACE_ID': 'your-space-id',
         'PORT': '8080',
+        'HOST': '0.0.0.0',
         'ENV': 'prod',
         'SCARF_NO_ANALYTICS': 'true',
         'DO_NOT_TRACK': 'true',
@@ -138,9 +142,11 @@ export function detectProjectType(repoInfo: any, dockerConfig: any): {
         'OLLAMA_BASE_URL': 'https://your-ollama-server.com (可选)'
       },
       warnings: [
-        'Open WebUI需要外部LLM服务（如OpenAI API或Ollama服务器）',
-        '建议设置强密码的WEBUI_SECRET_KEY',
-        '大型模型可能需要更多存储空间'
+        '⚠️ 必须设置ADMIN_USER_EMAIL和ADMIN_USER_PASSWORD创建管理员账户',
+        '⚠️ SPACE_ID需要设置为您的Space ID (格式: username/space-name)',
+        '⚠️ WEBUI_SECRET_KEY必须设置为强随机字符串',
+        '⚠️ 需要外部LLM服务（OpenAI API或Ollama服务器）才能正常工作',
+        '⚠️ 首次启动可能需要几分钟下载模型'
       ],
       hardwareRecommendation: 'cpu-upgrade'
     }

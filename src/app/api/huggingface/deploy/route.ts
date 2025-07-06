@@ -179,25 +179,46 @@ async function executeDeployment(
 
     // 创建README.md（如果不存在）
     if (!uploadedFiles.includes('README.md')) {
+      // 检测是否为Open WebUI项目
+      const isOpenWebUI = repoInfo.name.toLowerCase().includes('open-webui') ||
+                         repoInfo.name.toLowerCase().includes('openwebui')
+
       const readmeContent = `---
 title: ${deploymentConfig.spaceName}
-emoji: 🚀
-colorFrom: blue
-colorTo: green
+emoji: ${isOpenWebUI ? '🤖' : '🚀'}
+colorFrom: ${isOpenWebUI ? 'blue' : 'blue'}
+colorTo: ${isOpenWebUI ? 'purple' : 'green'}
 sdk: docker
 pinned: false
+${isOpenWebUI ? 'app_port: 8080' : ''}
 ---
 
 # ${deploymentConfig.spaceName}
 
 ${deploymentConfig.description || 'Deployed from GitHub using GH2HF Deployer'}
 
+${isOpenWebUI ? `
+## ⚠️ 重要配置说明
+
+这是一个Open WebUI部署。为了正常工作，请在Space设置中配置以下环境变量：
+
+\`\`\`env
+WEBUI_SECRET_KEY=your-secret-key-here
+ADMIN_USER_EMAIL=admin@example.com
+ADMIN_USER_PASSWORD=your-strong-password
+SPACE_ID=${spaceId}
+OPENAI_API_KEY=sk-your-openai-api-key
+\`\`\`
+
+首次启动可能需要几分钟。配置完成后，使用设置的邮箱和密码登录。
+` : ''}
+
 ## Original Repository
 ${repoUrl}
 `
       await hfClient.uploadFile(spaceId, 'README.md', readmeContent)
       updateStatus({
-        log: '创建README.md文件'
+        log: `创建README.md文件${isOpenWebUI ? ' (包含Open WebUI配置说明)' : ''}`
       })
     }
 

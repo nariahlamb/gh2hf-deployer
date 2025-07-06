@@ -105,8 +105,17 @@ app_port: 8080
 
 #### 基础配置 (必需)
 ```env
+# 核心安全配置
 WEBUI_SECRET_KEY=your-generated-secret-key
+
+# Hugging Face Space特殊配置 (重要!)
+SPACE_ID=your-username/your-space-name
+ADMIN_USER_EMAIL=admin@example.com
+ADMIN_USER_PASSWORD=your-strong-password
+
+# 服务器配置
 PORT=8080
+HOST=0.0.0.0
 ENV=prod
 ```
 
@@ -192,17 +201,42 @@ HF_HOME=/app/backend/data/cache/embedding/models
 
 ## 🐛 常见问题解决
 
-### 1. **连接问题**
-- 检查`OLLAMA_BASE_URL`或`OPENAI_API_BASE_URL`
-- 验证API密钥有效性
-- 确认网络连接
+### 1. **404错误 - 最常见问题**
+**症状**: Space部署成功但访问时显示404错误
 
-### 2. **模型加载失败**
+**原因**: 缺少关键的Hugging Face Space配置
+
+**解决方案**:
+```env
+# 必须设置这些环境变量
+SPACE_ID=your-username/your-space-name
+ADMIN_USER_EMAIL=admin@example.com
+ADMIN_USER_PASSWORD=your-strong-password
+WEBUI_SECRET_KEY=your-secret-key
+```
+
+### 2. **管理员账户问题**
+**症状**: 无法登录或没有管理员账户
+
+**解决方案**:
+- 确保设置了`ADMIN_USER_EMAIL`和`ADMIN_USER_PASSWORD`
+- 首次启动时会自动创建管理员账户
+- 使用设置的邮箱和密码登录
+
+### 3. **LLM连接问题**
+**症状**: 无法与AI模型对话
+
+**解决方案**:
+- 设置`OPENAI_API_KEY`连接OpenAI API
+- 或设置`OLLAMA_BASE_URL`连接外部Ollama服务
+- 检查API密钥有效性和网络连接
+
+### 4. **模型加载失败**
 - 检查`HF_HUB_OFFLINE`设置
 - 验证模型名称正确性
 - 确认存储空间充足
 
-### 3. **权限错误**
+### 5. **权限错误**
 - 检查文件权限设置
 - 验证`UID`和`GID`配置
 
