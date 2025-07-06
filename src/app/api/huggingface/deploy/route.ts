@@ -172,5 +172,7 @@ async function executeDeployment(
   }
 }
 
-// 导出deploymentStore供status API使用
-export const getDeploymentStore = () => deploymentStore
+// deploymentStore供status API使用 - 通过全局变量访问
+if (typeof global !== 'undefined') {
+  (global as any).deploymentStore = deploymentStore
+}

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDeploymentStore } from '../deploy/route'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +12,8 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const deploymentStore = getDeploymentStore()
+    // 获取全局deploymentStore
+    const deploymentStore = (global as any).deploymentStore || new Map()
     const status = deploymentStore.get(deploymentId)
     
     if (!status) {
