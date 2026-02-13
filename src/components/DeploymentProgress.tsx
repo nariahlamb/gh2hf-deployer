@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle, XCircle, Loader2, ExternalLink, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,11 +20,31 @@ export function DeploymentProgress() {
   } = useAppStore()
 
   const [logs, setLogs] = useState<string[]>([])
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const deploymentStartedRef = useRef(false)
+
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current)
+      pollTimeoutRef.current = null
+    }
+  }
 
   useEffect(() => {
-    if (!repoInfo || !deploymentConfig) return
+    if (!repoInfo || !deploymentConfig || deploymentStartedRef.current) return
 
+    deploymentStartedRef.current = true
     startDeployment()
+
+    return () => {
+      stopPolling()
+      deploymentStartedRef.current = false
+    }
   }, [repoInfo, deploymentConfig])
 
   const startDeployment = async () => {
@@ -46,6 +66,7 @@ export function DeploymentProgress() {
       
     } catch (error: any) {
       console.error('Deployment error:', error)
+      deploymentStartedRef.current = false
       setError(error.message || '部署过程中发生错误')
       setDeploymentStatus({
         stage: 'error',
@@ -57,7 +78,9 @@ export function DeploymentProgress() {
   }
 
   const pollDeploymentStatus = async (deploymentId: string) => {
-    const pollInterval = setInterval(async () => {
+    stopPolling()
+
+    pollIntervalRef.current = setInterval(async () => {
       try {
         const response = await axios.get(`/api/huggingface/status`, {
           params: { deploymentId }
@@ -73,21 +96,32 @@ export function DeploymentProgress() {
 
           // 如果部署完成或失败，停止轮询
           if (status.stage === 'completed' || status.stage === 'error') {
-            clearInterval(pollInterval)
+            stopPolling()
             if (status.stage === 'completed') {
               setCurrentStep('complete')
             }
+            deploymentStartedRef.current = false
           }
         }
       } catch (error) {
         console.error('Error polling deployment status:', error)
-        clearInterval(pollInterval)
+        stopPolling()
+        deploymentStartedRef.current = false
+        setError('获取部署状态失败，请稍后重试')
       }
     }, 3000) // 每3秒轮询一次
 
     // 10分钟后停止轮询
-    setTimeout(() => {
-      clearInterval(pollInterval)
+    pollTimeoutRef.current = setTimeout(() => {
+      stopPolling()
+      deploymentStartedRef.current = false
+      setError('部署状态查询超时，请检查 Space 实际状态后重试')
+      setDeploymentStatus({
+        stage: 'error',
+        progress: 0,
+        message: '部署状态查询超时',
+        error: '部署状态查询超时'
+      })
     }, 600000)
   }
 
@@ -116,12 +150,16 @@ export function DeploymentProgress() {
   }
 
   const handleRetry = () => {
+    stopPolling()
+    deploymentStartedRef.current = false
     setDeploymentStatus(null)
     setLogs([])
     startDeployment()
   }
 
   const handleNewDeployment = () => {
+    stopPolling()
+    deploymentStartedRef.current = false
     reset()
   }
 

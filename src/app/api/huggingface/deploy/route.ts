@@ -7,6 +7,26 @@ export const dynamic = 'force-dynamic'
 
 // 模拟部署状态存储（在生产环境中应该使用数据库）
 const deploymentStore = new Map<string, any>()
+const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024
+const MAX_FILES_TO_UPLOAD = 300
+const SKIP_PATH_PREFIXES = ['.git/', '.github/', 'node_modules/', '.next/', 'dist/', 'build/', 'coverage/']
+
+function normalizeSpaceStatus(status: string | undefined): string {
+  return (status || 'unknown').toLowerCase()
+}
+
+function isRunningStatus(status: string): boolean {
+  return status.includes('running') || status.includes('ready')
+}
+
+function isFailedStatus(status: string): boolean {
+  const failureKeywords = ['error', 'failed', 'failure', 'crash', 'stopped']
+  return failureKeywords.some(keyword => status.includes(keyword))
+}
+
+function shouldSkipPath(path: string): boolean {
+  return SKIP_PATH_PREFIXES.some(prefix => path.startsWith(prefix))
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     // 生成部署ID
     const deploymentId = `deploy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
+
     // 初始化部署状态
     const initialStatus = {
       deploymentId,
@@ -33,7 +53,7 @@ export async function POST(request: NextRequest) {
       spaceUrl: null,
       error: null
     }
-    
+
     deploymentStore.set(deploymentId, initialStatus)
 
     // 异步执行部署流程
@@ -66,18 +86,18 @@ export async function POST(request: NextRequest) {
 }
 
 async function executeDeployment(
-  deploymentId: string, 
-  repoUrl: string, 
-  repoInfo: any, 
+  deploymentId: string,
+  repoUrl: string,
+  repoInfo: any,
   deploymentConfig: any
 ) {
   const updateStatus = (updates: any) => {
     const current = deploymentStore.get(deploymentId)
     if (current) {
-      const updated = { ...current, ...updates }
-      if (updates.log) {
-        updated.logs = [...current.logs, updates.log]
-        delete updates.log
+      const { log, ...statusUpdates } = updates
+      const updated = { ...current, ...statusUpdates }
+      if (log) {
+        updated.logs = [...current.logs, log]
       }
       deploymentStore.set(deploymentId, updated)
     }
@@ -107,44 +127,22 @@ async function executeDeployment(
 
     const spaceId = `${username}/${deploymentConfig.spaceName}`
 
-    try {
-      // 真实的Hugging Face API调用
-      updateStatus({
-        log: `正在创建Space: ${deploymentConfig.spaceName}`
-      })
+    updateStatus({
+      log: `正在创建Space: ${deploymentConfig.spaceName}`
+    })
 
-      const space = await hfClient.createSpace({
-        spaceName: deploymentConfig.spaceName,
-        visibility: deploymentConfig.visibility,
-        hardware: deploymentConfig.hardware,
-        description: deploymentConfig.description,
-        tags: deploymentConfig.tags,
-        sdk: 'docker'
-      })
+    const space = await hfClient.createSpace({
+      spaceName: deploymentConfig.spaceName,
+      visibility: deploymentConfig.visibility,
+      hardware: deploymentConfig.hardware,
+      description: deploymentConfig.description,
+      tags: deploymentConfig.tags,
+      sdk: 'docker'
+    })
 
-      updateStatus({
-        log: `✅ Space创建成功: ${space.url}`
-      })
-
-      // 验证Space是否真的创建成功
-      try {
-        const spaceStatus = await hfClient.getSpaceStatus(spaceId)
-        updateStatus({
-          log: `✅ Space验证成功，状态: ${spaceStatus.status}`
-        })
-      } catch (verifyError: any) {
-        updateStatus({
-          log: `⚠️ Space创建成功但验证失败: ${verifyError.message}`
-        })
-      }
-
-    } catch (error: any) {
-      updateStatus({
-        log: `❌ Space创建失败: ${error.message}`
-      })
-      console.error('Space creation error details:', error)
-      throw error
-    }
+    updateStatus({
+      log: `✅ Space创建成功: ${space.url}`
+    })
 
     // 步骤2: 获取GitHub仓库内容
     updateStatus({
@@ -154,37 +152,113 @@ async function executeDeployment(
       log: '正在从GitHub获取代码...'
     })
 
-    // 解析GitHub URL
-    const repoUrl = repoInfo.html_url
-    const [, , , owner, repo] = repoUrl.split('/')
+    const owner = repoInfo?.owner?.login
+    const repo = repoInfo?.name
+    const defaultBranch = repoInfo?.default_branch || 'main'
 
-    // 获取仓库的主要文件
-    const filesToUpload = ['Dockerfile', 'docker-compose.yml', 'requirements.txt', 'package.json', 'README.md']
+    if (!owner || !repo) {
+      throw new Error('无法解析仓库 owner/repo 信息')
+    }
+
+    const branchResponse = await octokit.rest.repos.getBranch({
+      owner,
+      repo,
+      branch: defaultBranch
+    })
+    const treeSha = branchResponse.data.commit.commit.tree.sha
+
+    const treeResponse = await octokit.rest.git.getTree({
+      owner,
+      repo,
+      tree_sha: treeSha,
+      recursive: '1'
+    })
+
+    const treeItems = (treeResponse.data.tree as Array<{
+      path?: string
+      sha?: string
+      size?: number
+      type?: string
+    }>)
+
+    const filesToUpload = treeItems
+      .filter(item => item.type === 'blob' && !!item.path && !!item.sha)
+      .filter(item => !shouldSkipPath(item.path!))
+
+    if (filesToUpload.length === 0) {
+      throw new Error('仓库中没有可上传文件')
+    }
+
     const uploadedFiles: string[] = []
+    let skippedBinaryFiles = 0
+    let skippedLargeFiles = 0
+    let failedFiles = 0
 
-    for (const fileName of filesToUpload) {
+    for (const file of filesToUpload) {
+      if (uploadedFiles.length >= MAX_FILES_TO_UPLOAD) {
+        updateStatus({
+          log: `已达到上传文件上限 ${MAX_FILES_TO_UPLOAD}，停止继续上传`
+        })
+        break
+      }
+
+      if ((file.size || 0) > MAX_FILE_SIZE_BYTES) {
+        skippedLargeFiles++
+        continue
+      }
+
       try {
-        const { data: fileData } = await octokit.rest.repos.getContent({
+        const { data: blobData } = await octokit.rest.git.getBlob({
           owner,
           repo,
-          path: fileName,
+          file_sha: file.sha!
         })
 
-        if ('content' in fileData) {
-          const content = Buffer.from(fileData.content, 'base64').toString('utf-8')
-          await hfClient.uploadFile(spaceId, fileName, content)
-          uploadedFiles.push(fileName)
+        if (blobData.encoding !== 'base64' || !blobData.content) {
+          failedFiles++
+          continue
+        }
+
+        const fileBuffer = Buffer.from(blobData.content, 'base64')
+        if (fileBuffer.includes(0)) {
+          skippedBinaryFiles++
+          continue
+        }
+
+        const content = fileBuffer.toString('utf-8')
+        await hfClient.uploadFile(spaceId, file.path!, content)
+        uploadedFiles.push(file.path!)
+
+        if (uploadedFiles.length <= 20 || uploadedFiles.length % 20 === 0) {
           updateStatus({
-            log: `上传文件: ${fileName}`
+            log: `上传文件: ${file.path}`
           })
         }
-      } catch (error: any) {
-        if (error.status !== 404) {
-          updateStatus({
-            log: `警告: 无法上传 ${fileName}: ${error.message}`
-          })
-        }
+      } catch {
+        failedFiles++
       }
+    }
+
+    if (!uploadedFiles.includes('Dockerfile')) {
+      throw new Error('未上传到 Dockerfile，Hugging Face Docker Space 无法构建')
+    }
+
+    if (skippedLargeFiles > 0) {
+      updateStatus({
+        log: `跳过大文件 ${skippedLargeFiles} 个（单文件 > ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB）`
+      })
+    }
+
+    if (skippedBinaryFiles > 0) {
+      updateStatus({
+        log: `跳过二进制文件 ${skippedBinaryFiles} 个`
+      })
+    }
+
+    if (failedFiles > 0) {
+      updateStatus({
+        log: `上传失败文件 ${failedFiles} 个，请检查仓库权限或文件编码`
+      })
     }
 
     // 步骤3: 创建Space配置文件
@@ -197,9 +271,8 @@ async function executeDeployment(
 
     // 创建README.md（如果不存在）
     if (!uploadedFiles.includes('README.md')) {
-      // 检测是否为Open WebUI项目
       const isOpenWebUI = repoInfo.name.toLowerCase().includes('open-webui') ||
-                         repoInfo.name.toLowerCase().includes('openwebui')
+        repoInfo.name.toLowerCase().includes('openwebui')
 
       const readmeContent = `---
 title: ${deploymentConfig.spaceName}
@@ -234,6 +307,7 @@ OPENAI_API_KEY=sk-your-openai-api-key
 ## Original Repository
 ${repoUrl}
 `
+
       await hfClient.uploadFile(spaceId, 'README.md', readmeContent)
       updateStatus({
         log: `创建README.md文件${isOpenWebUI ? ' (包含Open WebUI配置说明)' : ''}`
@@ -241,7 +315,7 @@ ${repoUrl}
     }
 
     updateStatus({
-      log: `代码上传完成，共上传 ${uploadedFiles.length + 1} 个文件`
+      log: `代码上传完成，共上传 ${uploadedFiles.length} 个文件`
     })
 
     // 步骤4: 等待构建
@@ -258,30 +332,58 @@ ${repoUrl}
     // 检查构建状态
     let buildAttempts = 0
     const maxAttempts = 30 // 最多等待5分钟
+    let lastStatus = 'unknown'
+    let hasStarted = false
+    let isRunning = false
 
     while (buildAttempts < maxAttempts) {
+      let currentStatus: string
+
       try {
         const spaceStatus = await hfClient.getSpaceStatus(spaceId)
-        updateStatus({
-          log: `构建状态: ${spaceStatus.status}`
-        })
-
-        if (spaceStatus.status === 'running') {
-          updateStatus({
-            log: 'Space构建完成并正在运行'
-          })
-          break
-        } else if (spaceStatus.status === 'error') {
-          throw new Error('Space构建失败')
-        }
+        currentStatus = spaceStatus.status
       } catch (error: any) {
+        buildAttempts++
         updateStatus({
-          log: `检查状态时出错: ${error.message}`
+          log: `检查状态失败(${buildAttempts}/${maxAttempts}): ${error.message}`
         })
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        continue
+      }
+
+      const normalizedStatus = normalizeSpaceStatus(currentStatus)
+      lastStatus = currentStatus
+
+      if (!hasStarted && normalizedStatus !== 'unknown') {
+        hasStarted = true
+      }
+
+      updateStatus({
+        log: `构建状态: ${currentStatus}`
+      })
+
+      if (isFailedStatus(normalizedStatus)) {
+        throw new Error(`Space构建失败，当前状态: ${currentStatus}`)
+      }
+
+      if (isRunningStatus(normalizedStatus)) {
+        isRunning = true
+        updateStatus({
+          log: 'Space构建完成并正在运行'
+        })
+        break
       }
 
       buildAttempts++
       await new Promise(resolve => setTimeout(resolve, 10000)) // 等待10秒
+    }
+
+    if (!hasStarted) {
+      throw new Error('Space 未进入构建流程，请检查仓库内容和 Dockerfile')
+    }
+
+    if (!isRunning) {
+      throw new Error(`Space 在等待时间内未就绪，最后状态: ${lastStatus}`)
     }
 
     // 步骤5: 完成

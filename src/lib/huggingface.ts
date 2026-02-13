@@ -192,10 +192,10 @@ ${params.description || 'Deployed from GitHub using GH2HF Deployer'}
   async validateToken(): Promise<boolean> {
     try {
       // 使用官方 whoAmI 函数验证 token
-      const userInfo = await hfWhoAmI({
+      await hfWhoAmI({
         credentials: { accessToken: this.accessToken }
       })
-      return !!userInfo.name
+      return true
     } catch (error) {
       console.error('Token validation failed:', error)
       return false
